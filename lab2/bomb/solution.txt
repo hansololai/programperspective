@@ -1,0 +1,11 @@
+From the bomb.c code we can see that the main function calls phase_1,phase_2...  if any of the phase didn't pass, the bomb will explode. First we disassemble the binary into ELF format using objdump, 
+
+objdump -d bomb (or mac, windows equivalent)
+
+This will generate output in ELF format, I saved it in bomb.assembly file. The address start with 0x400xxx instead of 0x000000 because there are program headers. 
+
+phase 1. Searching the <phase_1> 0x400ee0, in line 2, it moves the pointer 0x402400 to %esi, which is the first parameter for next function call <string_not_equal>. This obviously means it comparing user input with the string stored at location 0x402400. 
+objdump -d does not output the static contents or symbals, using objdum -s to get the full content, (bomb.fullcontent), at location 0x402400, the string is "Border relations with Canada have never been better", the four 00000000 are string ending. 
+
+ 
+
