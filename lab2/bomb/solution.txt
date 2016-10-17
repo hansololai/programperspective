@@ -9,3 +9,15 @@ objdump -d does not output the static contents or symbals, using objdum -s to ge
 
  
 
+ phase 2.  It starts with reserving 0x28 space(40 bytes) passing the input text in %rsi, then read_six_numbers function read these numbers and save the numbers
+ in the stack. (which is pointed by %rsp the stack pointer).   at 400f01, it compare with the 1st number to 1. if passes, then it goes in a loop, 
+ the loop is between 400f17-400f30.  everytime, the value i %eax is multiplied by 2 (400f1a) and compare to the next value. This indicates the number are 1 2 4 8 16...
+ 
+ 
+ 
+phase 3. The sscanf function is called to get the number from the input text. The format string is located at 0x4025cf. Look at the bomb.full, we can see it's "%d %d",
+so the input is two numbers. The commands in 400f6a and 400f6f are default case for a switch statement, with the range 0<=x<=7. If not, it will jump  to 400fad which explod the bomb
+the value 0x8(%rsp), which is value of %rdx. (one of the number you entered). The coorsponding address for switch(x) are stored at 402470 in bomb.full:
+0->400f7c, 1->400fb9, 2->400f83, 3->400f8a,etc... In each block, it simply copy a integer to %eax, then jump to fbe to compare with 0xc(%rsp), which is another number you entered. 
+the number map is: 0->0xcf, 1->0x137, 2->0x2c3,3->0x100, 4->0x185,5->0xce,6->0x2aa, 7->0x147.  enter any of these combination would defuse the bomb.
+
