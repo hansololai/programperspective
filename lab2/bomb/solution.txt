@@ -30,3 +30,27 @@ then this number is in %rdx, then mod 16 to make sure only last 4 bits are left.
 This loop for 6 times, the processed string is stored in %rsp+16. At the end, called string_not_equal function, where %rdi is this string, %rsi points to 0x40245e. The string is "flyers". 
 So to get these characters, from the x string we can get the index are: 9 15 14 5 6 7. These number, convert to character using ascII are special characters and stuff
 but because it was mod 16, we can add 32 to them. So the index 41,47,46,37,38,39. correspond the string ")/.%&'"
+
+
+phase 6. Start with read six numbers and put them all in address by %rsp. The same location got multiple pointers: %r13,%rsi,%r14. 
+Step 1. A loop of r12d from 0 to 6. From 401114 to 401151. Inside the loop, first, it made sure every number, after substract 1 (40111b), is between 0 and 5, otherwise explode. then a small loop in second half. from 401135 to 40114b. This section go boom if the rest numbers are the same as the current one. 
+Basically this whole loop ensures every number is unique and between 1 and 6. 
+
+Step 2. Another loop of %rax from %rsp to %rsi, which equals to %rsp+24. (401160 to 40116d). So every number is substracted by 7, and restored at the same location. 
+
+Step 3. This section also loops through each number and fill an array of 8 byte address located at %rsp+32. (401188). Each time %rsi is increased by 4, but when filling the array, it is multplied by 2. 
+If the number is not greater than 1, then the address is 6032d0. otherwise it go through the static mapping located at 6032d0. This process is very tricky, 
+It find the 8 byte data located at 6032d0+8, which is another address (6032e0), then use it to get data at 6032e0+8, which is 6032f0.. so on. 
+Basically num -> address mapping is 1->6032d0, 2->6032e0,3->6032f0, 4->603300, 5->603310, 6->603320.  each address is 8 bytes and they are stored in %rsp+32, as same order as the number array. 
+
+Step 4 starts from 4011ab. It is also a loop from %rsp+23 to %rsp+80, 6 in total. initially %rcx is the first value. 60xxxxx, then %rdx is the next value, and is saved at %rcx+8
+the third value is saved at second value +8 and so on. The last value +8, is stored 0. 
+
+Step 5. Starts at 4011da. %ebp =5, %rbx is the value at %rsp+32. Should be an address 60xxxx, Then %rax is the value located at 60xxxx+8. This %rax should be another address start with 60yyyy. 
+Then the actual int value pointed by 60yyyy is stored at %eax
+If the int value stored at location pointed by %rbx is less than the int value %eax, then explode. This process is also looped 5 times. 
+
+
+Because all the int pointed by these 60xxxx address are static, these number and address are interleaved. x1,y1,x2,y2,x3,y3...where x are int values, y are addresses. 
+The condition is for every x1, the number pointed by y1 must be smaller. The address order are:
+6032d0,6032f0,603300,603310,603320,6032e0
