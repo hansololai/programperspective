@@ -1,0 +1,5 @@
+This lab has five phases. 
+Before doing anything, first, of course, get the objdump of ctarget. 
+phase 1. In pdf section 4.1, When the function getbuff() is called in test() in location 0x401971, the return address: 0x401976, is saved in the top of the stack, then in getbuff, it pre-allocated 0x28=40 bytes for the text that user will enter. It's easy to see, right after these 40 bytes is the return address. To redirect the getbuff() to touch1(), we simply have to imput 40 bytes of random characters (no 0x00, no \n), then the address of touch 1 in little endian format. 0x4017c0 ->c0 17 40. Using the hex2raw, the exploit.txt is converted to hex, then feed into ctarget with command cat exploit.txt | ./hex2raw | ./ctarget
+
+phase 2. 
