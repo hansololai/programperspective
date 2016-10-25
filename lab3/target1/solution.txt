@@ -7,7 +7,7 @@ The 31 does not matter, just as place holder.
 
 
 phase 2. 
-Now calling touch2() is easy, but before that, we need to get copy a cookie address to $rdi, as the parameter to pass in. 
+Now calling touch2() is easy, but before that, we need to get copy a cookie to %rdi, as the parameter to pass in. 
 This ctarget is not compiled with protection of injecting code. Using gdb to run it once to getbuf. Then print the address of %rsp. 
 Which is 0x5561dc78. At location 0x6044e4 is the cookie. 
 To move a 4 byte value at address 0x6044e4 to %edi. We need 
@@ -32,3 +32,11 @@ mov 0x5561dc78 %edi
 opcode:
 bf 78 dc 61 55, plus the return C3 the address of the start of this instruction is 0x5561dc78+9=0x5561dc81. which is the first overflowed address
 35 39 62 39 39 37 66 61 00 bf 78 dc 61 55 C3 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 81 dc 61 55 00 00 00 00 fa 18 40 00
+
+phase 4. 
+This phase we are using return-oriented method to attack rtarget.c. The hard part is still copy the cookie to %rdi. The strategy to do it is to save the cookie in the overflowed buffer to replace current address pointed by %rsp. Then load it to some register, then move it to %rdi. then return. and %rsp points to next address, which is address of touch2().
+Basically a pop instruction, then a mov instruction. From the farming section, after careful examination, we can find a 58 (pop to %rdx)  in address 0x4019ab followed by 90 (nop), then return (c3). The %rsp first points to 8 byte address 0x4019ab, then this address is moved to %rip (program counter), then  %rsp pointer will move forward 8 bytes, point to 8 byte cookie data. Executing popq instruction (58) would pop the (%rsp) to %rdx. In order  mov the value to %rdi, there is  48 89 c7 at address 0x4019a2, followed by return. After these two gadgets, we then call touch2() at address 0x4017ec
+Therefore the exploit string is:
+31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 31 ab 19 40 00 00 00 00 00 fa 97 b9 59 00 00 00 00 a2 19 40 00 00 00 00 00 ec 17 40 00 00 00 00 00 
+
+phase 5 is much more complicated than it looks, I'll get back to it after other labs
