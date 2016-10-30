@@ -9,7 +9,9 @@ static int b=4;
 static int s=4;
 char * infile=NULL;
 FILE * f;
-
+int hitNumber=0;
+int missNumber=0;
+int eviction=0;
 typedef struct block {
     char valid; 
     long tag;
@@ -67,12 +69,15 @@ void handleOneAccess(Line * cache,long address){
         LRU->rank=highestRank+1;
 	LRU->tag=tagN;
 	printf(" miss");	
+	missNumber++;
 	if(LRU->valid){
 	    printf(" eviction");
+	    eviction++;
 	}
 	LRU->valid=1;
     }else{
         printf(" hit"); 
+	hitNumber++;
     }
 }
 void handleLine(char* line,Line * cache){
@@ -140,11 +145,11 @@ int main(int argc, char *argv[])
     int S=1<<s;  
     Line * cache= (Line *)calloc(S*E,sizeof(Line));
     char input[255];
-    printf("starting processing file");
     while(fgets(input,255,f)){
    	handleLine(input,cache); 
     } 
     free(cache);
-   // printSummary(0, 0, 0);
+  //  printSummary(0, 0, 0);
+    printf("hit:%d misses:%d evictions:%d",hitNumber,missNumber,eviction);
     return 0;
 }
