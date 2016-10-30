@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
    	handleLine(input,cache); 
     } 
     free(cache);
-  //  printSummary(0, 0, 0);
-    printf("hit:%d misses:%d evictions:%d",hitNumber,missNumber,eviction);
+    printSummary(hitNumber, missNumber,eviction);
+   // printf("hit:%d misses:%d evictions:%d",hitNumber,missNumber,eviction);
     return 0;
 }
