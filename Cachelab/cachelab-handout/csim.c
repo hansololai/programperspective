@@ -46,12 +46,12 @@ void handleOneAccess(Line * cache,long address){
     Line * curLine=NULL;
     Line * LRU=NULL;
     char hit=0x0;
-
+    Line * found=NULL;
     for(i=0;i<E;i++){
         curLine=(curSet +i);
 	if(curLine->tag==tagN&&curLine->valid){
            hit=1; 
-	    break;
+	    found=curLine;
 	}
 //	printf("rank is %d, lowestrank is %d",curLine->rank,lowestRank);
 	if(curLine->rank<lowestRank){
@@ -76,7 +76,11 @@ void handleOneAccess(Line * cache,long address){
 	}
 	LRU->valid=1;
     }else{
-        printf(" hit"); 
+        printf(" hit");
+	// If the one found is not highest rank, update rank
+	if(found->rank<highestRank){
+	    found->rank=highestRank+1;
+	} 
 	hitNumber++;
     }
 }
@@ -136,6 +140,7 @@ int main(int argc, char *argv[])
 	    break;
 	case 'h':
 	default:
+	    printf("exit");
 	    exit(1);
 	}
     }   
@@ -149,7 +154,7 @@ int main(int argc, char *argv[])
    	handleLine(input,cache); 
     } 
     free(cache);
-    printSummary(hitNumber, missNumber,eviction);
-   // printf("hit:%d misses:%d evictions:%d",hitNumber,missNumber,eviction);
+//    printSummary(hitNumber, missNumber,eviction);
+    printf("hit:%d misses:%d evictions:%d",hitNumber,missNumber,eviction);
     return 0;
 }
