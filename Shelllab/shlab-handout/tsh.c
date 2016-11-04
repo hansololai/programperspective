@@ -168,13 +168,29 @@ void eval(char *cmdline)
     char ** argv=calloc(MAXARGS,sizeof(char*));
     int bg=parseline(cmdline,argv);
 
-    if(builtin_cmd(argv)==0)
+    if(builtin_cmd(argv)!=0)
 	return; /* return if already did built-in command*/
-    
-
-
-
-    return;
+    int pid;
+    if(!bg){
+	/* foreground process */
+	pid=fork();
+    	if(pid==0){
+    	    /* Child process */
+    	    if (execve(argv[0],argv,environ)<0){
+    	        /* error executing */
+    	        printf("%s: Command not found.\n",argv[0]);
+    	        exit(1);
+    	    }
+	    return;
+    	}
+    	/* Parent */
+    	printf("add job for %d\n",pid);
+    	addjob(jobs,pid,FG,cmdline); 
+    	waitfg(pid);
+	return;
+    }
+    /* background process */
+        
 }
 
 /* 
@@ -244,9 +260,8 @@ int builtin_cmd(char **argv)
         exit(0);
     }else if(strcmp(argv[0],"jobs")==0){
 	 return 1;
-    }else if(strcmp(argv[0],"fg")==0){
-	return 1;
-    }else if(strcmp(argv[0],"bg")==0){
+    }else if(strcmp(argv[0],"fg")==0||strcmp(argv[0],"bg")==0){
+	do_bgfg(argv);
 	return 1; 
     }
 
@@ -266,6 +281,16 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
+
+    int child_status;
+    int cid;
+    printf("waiting for %d\n",pid);
+
+    while(cid=wait(&child_status)!=pid){ 
+	printf("%d finished but not %d",cid,pid);    
+    }
+    printf("%d finished and reaped\n",pid);
+    deletejob(jobs,cid);  
     return;
 }
 
