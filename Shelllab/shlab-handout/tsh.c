@@ -170,27 +170,26 @@ void eval(char *cmdline)
 
     if(builtin_cmd(argv)!=0)
 	return; /* return if already did built-in command*/
-    int pid;
-    if(!bg){
-	/* foreground process */
-	pid=fork();
-    	if(pid==0){
-    	    /* Child process */
-    	    if (execve(argv[0],argv,environ)<0){
-    	        /* error executing */
-    	        printf("%s: Command not found.\n",argv[0]);
-    	        exit(1);
-    	    }
-	    return;
+   
+    int pid=fork(); /* create child process */
+    /* Execute the command in child process */ 
+    if(pid==0){
+	/* Child process */
+  	if (execve(argv[0],argv,environ)<0){
+        /* error executing */
+            printf("%s: Command not found.\n",argv[0]);
+    	    exit(1);
     	}
-    	/* Parent */
-    	printf("add job for %d\n",pid);
-    	addjob(jobs,pid,FG,cmdline); 
-    	waitfg(pid);
 	return;
+    }    
+    /* Parent */    
+    /* Add the job */ 
+    printf("add job for %d\n",pid);
+    addjob(jobs,pid,FG,cmdline); 
+     if(bg==0){
+    	/* Foreground process, parent need to wait */
+    	waitfg(pid);
     }
-    /* background process */
-        
 }
 
 /* 
@@ -307,7 +306,13 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-    return;
+    int errorbk=errno;
+    int finishedpid;    
+    int child_status;
+    while(finishedpid=waitpid(-1,&child_status,WNOHANG)>0){
+  	printf("background job %d finished, sid %d, child_status %d, \n",finishedpid, sig,child_status); 
+    }
+    errno=errorbk; 
 }
 
 /* 
