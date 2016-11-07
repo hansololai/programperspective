@@ -172,7 +172,12 @@ void eval(char *cmdline)
 	return; /* return if already did built-in command*/
    
     int pid=fork(); /* create child process */
-    /* Execute the command in child process */ 
+    /* Exit if unexpected cases, add job failed in parent */   
+    if(pid!=0)
+	if(addjobs(jobs,pid,FG,cmdline)==0){
+	    	    
+	}
+    /* Execute the command in child process */  
     if(pid==0){
 	/* Child process */
   	if (execve(argv[0],argv,environ)<0){
@@ -283,7 +288,6 @@ void waitfg(pid_t pid)
 
     int child_status;
     int cid;
-    printf("waiting for %d\n",pid);
 
     while(cid=wait(&child_status)!=pid){ 
 	printf("%d finished but not %d",cid,pid);    
