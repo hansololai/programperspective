@@ -170,22 +170,29 @@ void eval(char *cmdline)
 
     if(builtin_cmd(argv)!=0)
 	return; /* return if already did built-in command*/
-   
-    int pid=fork(); /* create child process */
-    /* Exit if unexpected cases, add job failed in parent */   
-    if(pid!=0)
-	if(addjobs(jobs,pid,FG,cmdline)==0){
-	    	    
+	
+	/* Check if can create job */
+	int available = 0;
+	for (i = 0; i < MAXJOBS; i++) {
+		if (jobs[i].pid == 0) {
+			available = 1;
+			break;
+		}
 	}
+	if (!available)
+		return;
+
+    int pid=fork(); /* create child process */
+    
     /* Execute the command in child process */  
     if(pid==0){
-	/* Child process */
-  	if (execve(argv[0],argv,environ)<0){
-        /* error executing */
-            printf("%s: Command not found.\n",argv[0]);
-    	    exit(1);
-    	}
-	return;
+		/* Child process */
+  		if (execve(argv[0],argv,environ)<0){
+			/* error executing */
+				printf("%s: Command not found.\n",argv[0]);
+    			exit(1);
+    		}
+		return;
     }    
     /* Parent */    
     /* Add the job */ 
