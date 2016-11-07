@@ -172,6 +172,7 @@ void eval(char *cmdline)
 	return; /* return if already did built-in command*/
 	
 	/* Check if can create job */
+	int i;	
 	int available = 0;
 	for (i = 0; i < MAXJOBS; i++) {
 		if (jobs[i].pid == 0) {
@@ -296,7 +297,12 @@ void waitfg(pid_t pid)
     int child_status;
     int cid;
 
-    while(cid=wait(&child_status)!=pid){ 
+    while((cid=wait(&child_status))!=pid){ 
+	if(cid<0){
+	    int err=errno;
+	    printf("wait return error %d\n",child_status);
+	    exit(-1);	
+	}
 	printf("%d finished but not %d",cid,pid);    
     }
     printf("%d finished and reaped\n",pid);
@@ -320,7 +326,7 @@ void sigchld_handler(int sig)
     int errorbk=errno;
     int finishedpid;    
     int child_status;
-    while(finishedpid=waitpid(-1,&child_status,WNOHANG)>0){
+    while((finishedpid=waitpid(-1,&child_status,WNOHANG))>0){
   	printf("background job %d finished, sid %d, child_status %d, \n",finishedpid, sig,child_status); 
     }
     errno=errorbk; 
