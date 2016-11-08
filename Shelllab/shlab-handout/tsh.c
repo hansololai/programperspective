@@ -192,9 +192,9 @@ void eval(char *cmdline)
     } 
     /* Execute the command in child process */  
     if(pid==0){
-		/* Child process */
-		/* If background, use /dev/null to redirect output */
-	int exestatus;
+	/* Child process */
+    Signal(SIGINT,  SIG_DFL);   /* ctrl-c */
+    Signal(SIGTSTP, SIG_DFL);  /* ctrl-z */
 	if(bg){
 	    if(close(1)<0){
 		if(verbose) printf("Closing stdout failed\n");
@@ -204,6 +204,7 @@ void eval(char *cmdline)
 		if(verbose) printf("Closing stderr failed\n");
 		exit(1);
 	    }
+	    for(;;);
 	    if (execve(argv[0],argv,environ)<0){
 		/* error executing */
 		exit(1);
@@ -221,10 +222,12 @@ void eval(char *cmdline)
     /* Parent */    
     /* Add the job */ 
     if(verbose) printf("add job for %d\n",pid);
-    addjob(jobs,pid,!bg,cmdline); 
     if(bg==0){
     	/* Foreground process, parent need to wait */
+        addjob(jobs,pid,FG,cmdline); 
     	waitfg(pid);
+    }else{
+	 addjob(jobs,pid,BG,cmdline); 
     }
 }
 
@@ -298,6 +301,10 @@ int builtin_cmd(char **argv)
 	listjobs(jobs);
 	return 1;
     }else if(strcmp(argv[0],"fg")==0||strcmp(argv[0],"bg")==0){
+	if(!argv[1]){
+	    printf("need more argument\n");
+	    return 1;
+	}
 	do_bgfg(argv);
 	return 1; 
     }
@@ -310,6 +317,35 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+    struct job_t * j;
+    int pid;
+    pid=atoi(argv[1]);
+    if(!pid){
+	/* pid is 0, not valid */
+	if(verbose) printf("Cannot convert pid number from %s\n",argv[1]);
+	return;
+    }
+    j=getjobpid(jobs,pid);
+    if(!j){
+	if(verbose) printf("cannot get job %d\n",pid);
+	return;
+    }
+    if(j->state==ST){
+	/* continue if it is stopped */
+	if(kill(pid,SIGCONT)){
+	    if(verbose) printf("cannot continue job %d\n",pid);
+	    return; 
+	}
+    }
+    /* continue job, move it to foreground or background */
+    if(strcmp(argv[0],"fg")==0){
+	printf("change to foreground\n");
+	j->state=FG;
+	waitfg(pid);
+    }else{
+	printf("change to background running \n");
+	j->state=BG;
+    }
     return;
 }
 
@@ -322,17 +358,18 @@ void waitfg(pid_t pid)
     int child_status;
     int cid;
 
-    while((cid=waitpid(pid, &child_status,0))!=pid){ 
+    while((cid=waitpid(pid, &child_status,WUNTRACED))!=pid){ 
 	if(cid<0){
-	    int err=errno;
-	    if(verbose) printf("wait return error %d\n",child_status);
-	    exit(-1);	
+	    if(verbose) printf("Child stoped unexpectedly\n"); 
+	    return;
 	}
-	if(verbose) printf("%d finished but not %d",cid,pid);    
+	if(verbose) printf("%d finished but not %d",cid,pid);
+	if(!deletejob(jobs,cid)){
+	    if(verbose) printf("delete job %d failed\n",cid);
+        } 
     }
-    if(verbose) printf("%d finished and reaped\n",pid);
-    deletejob(jobs,cid);  
-    return;
+    if(verbose) printf("%d stopped\n",pid);
+   return;
 }
 
 /*****************
@@ -352,6 +389,9 @@ void sigchld_handler(int sig)
     int finishedpid;    
     int child_status;
     while((finishedpid=waitpid(-1,&child_status,WNOHANG))>0){
+	if(!deletejob(jobs,finishedpid)){
+	    if(verbose) printf("delete job %d failed\n",finishedpid);
+	}
 	if(verbose) printf("background job %d finished, sid %d, child_status %d, \n",finishedpid, sig,child_status); 
     }
     errno=errorbk; 
@@ -367,14 +407,14 @@ void sigint_handler(int sig)
     int mypid=getpid();
     if(verbose) printf("process %d received SIGINT\n",mypid);
     int pid=fgpid(jobs);
-    if(verbose) printf("Foreground process is %d, maybe because this is a child\n",pid);
+    if(verbose) printf("Foreground process is %d.\n",pid);
     if(pid<=0){
 	if(verbose) printf("No foreground processes to break.\n");
 	return;
     }
     if(mypid!=pid){
 	/* This is the parent */
-	kill(pid,SIGQUIT);
+	kill(pid,SIGINT);
     }
     return;
 }
@@ -386,6 +426,28 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+    int mypid=getpid();
+    if(verbose) printf("process %d received SIGTSTP\n",mypid);
+    int pid=fgpid(jobs);
+    if(verbose) printf("Foreground process is %d.\n",pid);
+    if(pid<=0){
+	if(verbose) printf("No foreground processes to break.\n");
+	return;
+    }
+    if(mypid!=pid){
+	/* This is the parent */
+	if(kill(pid,SIGTSTP)<0){
+	    /* failed to send STP */
+	    if(verbose) printf("Failed to suspend process %d\n",pid);
+	}else{
+	    struct job_t * t=getjobpid(jobs,pid);
+	    if(!t) {
+		if(verbose) printf("cannot get job %d\n",pid);
+		return;
+	    }
+	    t->state=ST;
+	}
+    }
     return;
 }
 
