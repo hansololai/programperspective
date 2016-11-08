@@ -193,7 +193,7 @@ void eval(char *cmdline)
     /* Execute the command in child process */  
     if(pid==0){
 	/* Child process */
-    Signal(SIGINT,  SIG_DFL);   /* ctrl-c */
+//    Signal(SIGINT,  SIG_DFL);   /* ctrl-c */
     Signal(SIGTSTP, SIG_DFL);  /* ctrl-z */
 	if(bg){
 	    if(close(1)<0){
@@ -410,11 +410,14 @@ void sigint_handler(int sig)
     if(verbose) printf("Foreground process is %d.\n",pid);
     if(pid<=0){
 	if(verbose) printf("No foreground processes to break.\n");
-	return;
     }
     if(mypid!=pid){
 	/* This is the parent */
-	kill(pid,SIGINT);
+	if(verbose) printf("try to kill children\n");
+	//kill(pid,SIGINT);
+    }else{
+	if(verbose) printf("Exit\n");
+	exit(0);
     }
     return;
 }
