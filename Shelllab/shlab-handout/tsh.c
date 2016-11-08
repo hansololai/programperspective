@@ -13,6 +13,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <libexplain/kill.h>
 
 /* Misc manifest constants */
 #define MAXLINE    1024   /* max line size */
@@ -168,23 +169,28 @@ void eval(char *cmdline)
 {
     char ** argv=calloc(MAXARGS,sizeof(char*));
     int bg=parseline(cmdline,argv);
-
-    if(builtin_cmd(argv)!=0)
+    if(argv[0]==NULL){
+	free(argv);
+	return;
+    }
+    if(builtin_cmd(argv)!=0){
+	free(argv);
 	return; /* return if already did built-in command*/
-	
-	/* Check if can create job */
-	int i;	
-	int available = 0;
-	for (i = 0; i < MAXJOBS; i++) {
-		if (jobs[i].pid == 0) {
-			available = 1;
-			break;
-		}
+    }
+    free(argv);	
+    /* Check if can create job */
+    int i;	
+    int available = 0;
+    for (i = 0; i < MAXJOBS; i++) {
+	    if (jobs[i].pid == 0) {
+	    available = 1;
+	    break;
 	}
-	if (!available){
-	    if(verbose) printf("Trying to create too many jobs\n");
-	    return;
-	}
+    }
+    if (!available){
+	if(verbose) printf("Trying to create too many jobs\n");
+	return;
+    }
 
     int pid=fork(); /* create child process */
     if(pid<0){
@@ -192,8 +198,9 @@ void eval(char *cmdline)
     } 
     /* Execute the command in child process */  
     if(pid==0){
+	setpgid(0,0); /* set children to its unique group */
 	/* Child process */
-//    Signal(SIGINT,  SIG_DFL);   /* ctrl-c */
+    Signal(SIGINT,  SIG_DFL);   /* ctrl-c */
     Signal(SIGTSTP, SIG_DFL);  /* ctrl-z */
 	if(bg){
 	    if(close(1)<0){
@@ -204,14 +211,16 @@ void eval(char *cmdline)
 		if(verbose) printf("Closing stderr failed\n");
 		exit(1);
 	    }
-	    for(;;);
+	    //for(;;);
+	    sleep(1);
 	    if (execve(argv[0],argv,environ)<0){
 		/* error executing */
 		exit(1);
 	    }
 	    return;	
 	}
-	for(;;);
+	//for(;;);
+	sleep(1);
   	if (execve(argv[0],argv,environ)<0){
 		/* error executing */
 		if(verbose) printf("%s: Command not found.\n",argv[0]);
@@ -368,6 +377,14 @@ void waitfg(pid_t pid)
 	    if(verbose) printf("delete job %d failed\n",cid);
         } 
     }
+    /* pause and terminate both get to here, have to decide whether to delete it or not */
+    if(WSTOPSIG(child_status)){
+	if(verbose) printf("SIGTSTP signal stopped child\n");
+	return;
+    }
+    if(!deletejob(jobs,cid)){
+	if(verbose) printf("delete job %d failed\n",cid);	
+    }
     if(verbose) printf("%d stopped\n",pid);
    return;
 }
@@ -410,11 +427,16 @@ void sigint_handler(int sig)
     if(verbose) printf("Foreground process is %d.\n",pid);
     if(pid<=0){
 	if(verbose) printf("No foreground processes to break.\n");
+	return;
     }
     if(mypid!=pid){
 	/* This is the parent */
 	if(verbose) printf("try to kill children\n");
-	//kill(pid,SIGINT);
+	int d;	
+	if((d=kill(pid,SIGINT))<0){
+	    if(verbose) printf("failed to kill children %d\n",d);
+	    if(verbose) printf("%s\n",explain_kill(pid,SIGINT));
+	}
     }else{
 	if(verbose) printf("Exit\n");
 	exit(0);
@@ -441,6 +463,7 @@ void sigtstp_handler(int sig)
 	/* This is the parent */
 	if(kill(pid,SIGTSTP)<0){
 	    /* failed to send STP */
+	    if(verbose) printf("%s\n",explain_kill(pid,SIGTSTP));
 	    if(verbose) printf("Failed to suspend process %d\n",pid);
 	}else{
 	    struct job_t * t=getjobpid(jobs,pid);
