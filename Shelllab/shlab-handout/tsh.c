@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <fcntl.h>
 
 /* Misc manifest constants */
 #define MAXLINE    1024   /* max line size */
@@ -180,45 +181,67 @@ void eval(char *cmdline)
 			break;
 		}
 	}
-	if (!available)
-		return;
+	if (!available){
+	    if(verbose) printf("Trying to create too many jobs\n");
+	    return;
+	}
 
     int pid=fork(); /* create child process */
-    
+    if(pid<0){
+	if(verbose) printf("Failed to create child process\n");
+    } 
     /* Execute the command in child process */  
     if(pid==0){
 		/* Child process */
-  		if (execve(argv[0],argv,environ)<0){
-			/* error executing */
-				printf("%s: Command not found.\n",argv[0]);
-    			exit(1);
-    		}
-		return;
+		/* If background, use /dev/null to redirect output */
+	int exestatus;
+	if(bg){
+	    if(close(1)<0){
+		if(verbose) printf("Closing stdout failed\n");
+		exit(1);
+	    }
+	    if(close(2)<0){
+		if(verbose) printf("Closing stderr failed\n");
+		exit(1);
+	    }
+	    if (execve(argv[0],argv,environ)<0){
+		/* error executing */
+		exit(1);
+	    }
+	    return;	
+	}
+	for(;;);
+  	if (execve(argv[0],argv,environ)<0){
+		/* error executing */
+		if(verbose) printf("%s: Command not found.\n",argv[0]);
+		exit(1);
+	}
+	return;
     }    
     /* Parent */    
     /* Add the job */ 
-    printf("add job for %d\n",pid);
-    addjob(jobs,pid,FG,cmdline); 
-     if(bg==0){
+    if(verbose) printf("add job for %d\n",pid);
+    addjob(jobs,pid,!bg,cmdline); 
+    if(bg==0){
     	/* Foreground process, parent need to wait */
     	waitfg(pid);
     }
 }
 
-/* 
- * parseline - Parse the command line and build the argv array.
- * 
- * Characters enclosed in single quotes are treated as a single
- * argument.  Return true if the user has requested a BG job, false if
- * the user has requested a FG job.  
- */
-int parseline(const char *cmdline, char **argv) 
-{
-    static char array[MAXLINE]; /* holds local copy of command line */
-    char *buf = array;          /* ptr that traverses command line */
-    char *delim;                /* points to first space delimiter */
-    int argc;                   /* number of args */
-    int bg;                     /* background job? */
+	/* 
+	 * parseline - Parse the command line and build the argv array.
+	 * 
+	 * Characters enclosed in single quotes are treated as a single
+	 * argument.  Return true if the user has requested a BG job, false if
+	 * the user has requested a FG job.  
+	 */
+	int parseline(const char *cmdline, char **argv) 
+	{
+	    static char array[MAXLINE]; /* holds local copy of command line */
+	    char *buf = array;          /* ptr that traverses command line */
+	    char *delim;                /* points to first space delimiter */
+	    int argc;                   /* number of args */
+	    int bg;                     /* background job? */
 
     strcpy(buf, cmdline);
     buf[strlen(buf)-1] = ' ';  /* replace trailing '\n' with space */
@@ -271,7 +294,9 @@ int builtin_cmd(char **argv)
     if(strcmp(argv[0],"quit")==0){
         exit(0);
     }else if(strcmp(argv[0],"jobs")==0){
-	 return 1;
+	/* print job list */
+	listjobs(jobs);
+	return 1;
     }else if(strcmp(argv[0],"fg")==0||strcmp(argv[0],"bg")==0){
 	do_bgfg(argv);
 	return 1; 
@@ -297,15 +322,15 @@ void waitfg(pid_t pid)
     int child_status;
     int cid;
 
-    while((cid=wait(&child_status))!=pid){ 
+    while((cid=waitpid(pid, &child_status,0))!=pid){ 
 	if(cid<0){
 	    int err=errno;
-	    printf("wait return error %d\n",child_status);
+	    if(verbose) printf("wait return error %d\n",child_status);
 	    exit(-1);	
 	}
-	printf("%d finished but not %d",cid,pid);    
+	if(verbose) printf("%d finished but not %d",cid,pid);    
     }
-    printf("%d finished and reaped\n",pid);
+    if(verbose) printf("%d finished and reaped\n",pid);
     deletejob(jobs,cid);  
     return;
 }
@@ -327,7 +352,7 @@ void sigchld_handler(int sig)
     int finishedpid;    
     int child_status;
     while((finishedpid=waitpid(-1,&child_status,WNOHANG))>0){
-  	printf("background job %d finished, sid %d, child_status %d, \n",finishedpid, sig,child_status); 
+	if(verbose) printf("background job %d finished, sid %d, child_status %d, \n",finishedpid, sig,child_status); 
     }
     errno=errorbk; 
 }
@@ -339,6 +364,18 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
+    int mypid=getpid();
+    if(verbose) printf("process %d received SIGINT\n",mypid);
+    int pid=fgpid(jobs);
+    if(verbose) printf("Foreground process is %d, maybe because this is a child\n",pid);
+    if(pid<=0){
+	if(verbose) printf("No foreground processes to break.\n");
+	return;
+    }
+    if(mypid!=pid){
+	/* This is the parent */
+	kill(pid,SIGQUIT);
+    }
     return;
 }
 
