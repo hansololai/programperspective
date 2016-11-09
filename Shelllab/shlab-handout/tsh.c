@@ -224,7 +224,7 @@ void eval(char *cmdline)
 	    return;	
 	}
 	//for(;;);
-//	sleep(1);
+	sleep(1);
  	if (execve(argv[0],argv,environ)<0){
 		/* error executing */
 		if(verbose) printf("%s: Command not found.\n",argv[0]);
@@ -383,14 +383,21 @@ void waitfg(pid_t pid)
         } 
     }
     /* pause and terminate both get to here, have to decide whether to delete it or not */
-    if(WSTOPSIG(child_status)){
-	if(verbose) printf("SIGTSTP signal stopped child\n");
-	return;
-    }
-    if(!deletejob(jobs,cid)){
-	if(verbose) printf("delete job %d failed\n",cid);	
-    }
-    if(verbose) printf("%d stopped\n",pid);
+   if (WIFEXITED(child_status)) {
+        printf("exited, status=%d\n", WEXITSTATUS(child_status));
+	if(!deletejob(jobs,cid)){
+	    if(verbose) printf("delete job %d failed\n",cid);	
+	}
+   } else if (WIFSIGNALED(child_status)) {
+        printf("killed by signal %d\n", WTERMSIG(child_status));
+	if(!deletejob(jobs,cid)){
+	    if(verbose) printf("delete job %d failed\n",cid);	
+	}
+   } else if (WIFSTOPPED(child_status)) {
+       printf("stopped by signal %d\n", WSTOPSIG(child_status));
+   } else if (WIFCONTINUED(child_status)) {
+       printf("continued\n");
+   } 
    return;
 }
 
@@ -480,6 +487,7 @@ void sigtstp_handler(int sig)
 	}
     }
     return;
+   
 }
 
 /*********************
