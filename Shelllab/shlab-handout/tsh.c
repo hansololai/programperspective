@@ -13,7 +13,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <libexplain/kill.h>
+//#include <libexplain/kill.h>
 
 /* Misc manifest constants */
 #define MAXLINE    1024   /* max line size */
@@ -203,6 +203,8 @@ void eval(char *cmdline)
     Signal(SIGINT,  SIG_DFL);   /* ctrl-c */
     Signal(SIGTSTP, SIG_DFL);  /* ctrl-z */
 	if(bg){
+	  int childid=getpid(); 
+	     printf("[%d] (%d) %s\n",nextjid,childid,cmdline);
 	    if(close(1)<0){
 		if(verbose) printf("Closing stdout failed\n");
 		exit(1);
@@ -212,16 +214,18 @@ void eval(char *cmdline)
 		exit(1);
 	    }
 	    //for(;;);
-	    sleep(1);
+//	    sleep(1);
 	    if (execve(argv[0],argv,environ)<0){
 		/* error executing */
+		if(verbose) printf("%s: Command not found.\n",argv[0]);
 		exit(1);
 	    }
+	    
 	    return;	
 	}
 	//for(;;);
-	sleep(1);
-  	if (execve(argv[0],argv,environ)<0){
+//	sleep(1);
+ 	if (execve(argv[0],argv,environ)<0){
 		/* error executing */
 		if(verbose) printf("%s: Command not found.\n",argv[0]);
 		exit(1);
@@ -238,6 +242,7 @@ void eval(char *cmdline)
     }else{
 	 addjob(jobs,pid,BG,cmdline); 
     }
+
 }
 
 	/* 
@@ -435,7 +440,7 @@ void sigint_handler(int sig)
 	int d;	
 	if((d=kill(pid,SIGINT))<0){
 	    if(verbose) printf("failed to kill children %d\n",d);
-	    if(verbose) printf("%s\n",explain_kill(pid,SIGINT));
+//	    if(verbose) printf("%s\n",explain_kill(pid,SIGINT));
 	}
     }else{
 	if(verbose) printf("Exit\n");
@@ -463,7 +468,7 @@ void sigtstp_handler(int sig)
 	/* This is the parent */
 	if(kill(pid,SIGTSTP)<0){
 	    /* failed to send STP */
-	    if(verbose) printf("%s\n",explain_kill(pid,SIGTSTP));
+//	    if(verbose) printf("%s\n",explain_kill(pid,SIGTSTP));
 	    if(verbose) printf("Failed to suspend process %d\n",pid);
 	}else{
 	    struct job_t * t=getjobpid(jobs,pid);
