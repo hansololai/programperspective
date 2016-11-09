@@ -203,6 +203,8 @@ void eval(char *cmdline)
     Signal(SIGINT,  SIG_DFL);   /* ctrl-c */
     Signal(SIGTSTP, SIG_DFL);  /* ctrl-z */
 	if(bg){
+	  int childid=getpid(); 
+	     printf("[%d] (%d) %s\n",nextjid,childid,cmdline);
 	    if(close(1)<0){
 		if(verbose) printf("Closing stdout failed\n");
 		exit(1);
@@ -212,16 +214,18 @@ void eval(char *cmdline)
 		exit(1);
 	    }
 	    //for(;;);
-	    sleep(1);
+//	    sleep(1);
 	    if (execve(argv[0],argv,environ)<0){
 		/* error executing */
+		if(verbose) printf("%s: Command not found.\n",argv[0]);
 		exit(1);
 	    }
+	    
 	    return;	
 	}
 	//for(;;);
-	sleep(1);
-  	if (execve(argv[0],argv,environ)<0){
+//	sleep(1);
+ 	if (execve(argv[0],argv,environ)<0){
 		/* error executing */
 		if(verbose) printf("%s: Command not found.\n",argv[0]);
 		exit(1);
@@ -238,6 +242,7 @@ void eval(char *cmdline)
     }else{
 	 addjob(jobs,pid,BG,cmdline); 
     }
+
 }
 
 	/* 
